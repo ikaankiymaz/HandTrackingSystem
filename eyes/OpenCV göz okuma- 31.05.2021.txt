@@ -1,0 +1,212 @@
+#En başta ihtiyacımız olan kütüphaneleri programımıza tanımlarız.
+import cv2
+import numpy as np
+import dlib
+from math import hypot
+import serial
+
+#arduino için uygun serial port ayarlanır ve kameradan görüntü alınır.
+serialport = serial.Serial('COM5',9600)
+cap = cv2.VideoCapture(0)
+
+#dlib kütüphanesi ile yüz algılamak için gerekli dosya yüklenir.
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+
+#arayüz tasarımı yapılır.
+arayuz = np.zeros((500, 1250, 3), np.uint8)#500x1250 boyutlarında 0-255 arası sıfırlar matrisi oluşturulur.
+komutlar = {0: "ACIL", 1: "AGRI", 2: "YEMEK", 3: "SU", 4: "DIK",
+            5: "SAG", 6: "SOL", 7: "TV", 8: "TEMIZLIK", 9: "WC"}
+
+#yazılan indekslerin arayüzdeki konumları belirlenir.
+def letter(komut_indeksi, text, beyaz_komut):
+    if komut_indeksi == 0:
+        x = 0
+        y = 0
+    elif komut_indeksi == 1:
+        x = 250
+        y = 0
+    elif komut_indeksi == 2:
+        x = 500
+        y = 0
+    elif komut_indeksi == 3:
+        x = 750
+        y = 0
+    elif komut_indeksi == 4:
+        x = 1000
+        y = 0
+    elif komut_indeksi == 5:
+        x = 0
+        y = 250
+    elif komut_indeksi == 6:
+        x = 250
+        y = 250
+    elif komut_indeksi == 7:
+        x = 500
+        y = 250
+    elif komut_indeksi == 8:
+        x = 750
+        y = 250
+    elif komut_indeksi == 9:
+        x = 1000
+        y = 250
+
+    #Gerekli genişlik, yükseklik ve kalınlık ayarları yapılıp uygun şekilde dikdörtgenler çizdirilir.
+    genislik = 250
+    yukseklik = 250
+    kalinlik = 3
+    if beyaz_komut is True:
+        cv2.rectangle(arayuz, (x + kalinlik, y + kalinlik), (x + genislik - kalinlik, y + yukseklik - kalinlik), (255, 255, 255), -1)
+    else:
+        cv2.rectangle(arayuz, (x + kalinlik, y + kalinlik), (x + genislik - kalinlik, y + yukseklik - kalinlik), (0, 255, 0), kalinlik)
+
+    # Arayüzde yazılan yazılar için font şekli, font büyüklüğü, font kalınlığı belirlenir ve text olarak oluşturulur.
+    font_sekli = cv2.FONT_HERSHEY_PLAIN
+    font_boyutu = 3
+    font_kalinligi = 2
+    yazi = cv2.getTextSize(text, font_sekli, font_boyutu, font_kalinligi)[0]
+    yazi_genislik, yazi_yukseklik = yazi[0], yazi[1]
+    yazi_x = int((genislik - yazi_genislik) / 2) + x
+    yazi_y = int((yukseklik + yazi_yukseklik) / 2) + y
+
+    #Oluşturulan arayüzün içine uygun konumda ve  kırmızı renkte(0,0,255)
+    cv2.putText(arayuz, text, (yazi_x, yazi_y), font_sekli, font_boyutu, (0, 0, 255), font_kalinligi)
+
+#iki noktanın ortasını belirlemek için fonksiyon tanımlanır.
+def orta_nokta(p1, p2):
+    return int((p1.x + p2.x)/2), int((p1.y + p2.y)/2)
+
+font = cv2.FONT_HERSHEY_PLAIN#Font şekli tanımlanır.
+
+#Gözün kapalı olduğunu anlamak için bir kırpma oranı belirlenir.
+def kirpma_orani(goz_noktalari, yuz_goruntusu):
+    #Gözün sol, sağ, üst ve alt noktaları belirlenir.
+    sag_nokta = (yuz_goruntusu.part(goz_noktalari[0]).x, yuz_goruntusu.part(goz_noktalari[0]).y)
+    sol_nokta = (yuz_goruntusu.part(goz_noktalari[3]).x, yuz_goruntusu.part(goz_noktalari[3]).y)
+    ust_orta = orta_nokta(yuz_goruntusu.part(goz_noktalari[1]), yuz_goruntusu.part(goz_noktalari[2]))
+    alt_orta = orta_nokta(yuz_goruntusu.part(goz_noktalari[5]), yuz_goruntusu.part(goz_noktalari[4]))
+
+    #Sol ve sağ noktaları arasında ve üst ve alt noktaları arasındaki mesafeler belirlenir.
+    yatay_uzunluk = hypot((sol_nokta[0] - sag_nokta[0]), (sol_nokta[1] - sag_nokta[1]))
+    dikey_uzunluk = hypot((ust_orta[0] - alt_orta[0]), (ust_orta[1] - alt_orta[1]))
+
+    #Yatay uzunluğa ve dikey uzunluk arasındaki oran çıkarılır.
+    oran = yatay_uzunluk / dikey_uzunluk
+    return oran
+
+#Sayaçlar belirlenir.
+cerceveler = 0
+komut_indeksi = 0
+kirpma_cerceve = 0
+yeni_aktif = ""
+
+#Şimdi yukarıda belirlediğimiz fonksiyonları aşağıda adımlarla gerçekleştirelim.
+while True:
+    #Kameradan çerçeveler alınır ve bu çerçeveleri 0.5 oranında küçültülür.
+    _, kamera_cerceveleri = cap.read()
+    kamera_cerceveleri = cv2.flip(kamera_cerceveleri, 1)
+    kamera_cerceveleri = cv2.resize(kamera_cerceveleri, None, fx=0.5, fy=0.5)
+    arayuz[:] = (0, 0, 0)
+    cerceveler += 1 #çerçeve sayısı 1 artırılır.
+
+    griton = cv2.cvtColor(kamera_cerceveleri, cv2.COLOR_BGR2GRAY)# Alınan çerçeve görüntüsünü gri formata çevrilir.
+
+    aktif_komut = komutlar[komut_indeksi]#Tüm komutların içerisindeki belirli komut indeksi aktif komut olarak atanır.
+
+    yuzler = detector(griton) #griton içerisindeki yüzler belirlenir.
+
+
+    for yuz in yuzler:#Eğer yüzler fonksiyonu doğruysa yuzler değişkeni yuz içerisine atanır ve komutlar yürütülür.
+
+        belirlenen_yuz = predictor(griton, yuz)#griton içerisindeki yüz belirlenir ve bu değer_yuz değişkenine atanır.
+
+        #İki gözün kırpması algılanır. Bunun için belirlenen yüz içindeki göze ait noktalar ve kırpma oranı fonksiyonu ile yapılır ve bu değer sol göz için ve sağ göz için ayrı ayrı hesaplanır.
+        sol_goz_orani = kirpma_orani([36, 37, 38, 39, 40, 41], belirlenen_yuz)
+        sag_goz_orani = kirpma_orani([42, 43, 44, 45, 46, 47], belirlenen_yuz)
+        toplam_kapanma_orani = (sol_goz_orani + sag_goz_orani) / 2#İki gözün kapanma oranına göre toplam kapanma oranı belirlenir.
+
+        #Eğer bulunan kapanma oranı belirli bir eşik değerinin üzerinde ise kamera ekranına "KIRPMA" yazdırılır.
+        if toplam_kapanma_orani > 5:
+            cv2.putText(kamera_cerceveleri, "KIRPMA", (50, 150), font, 4, (255, 0, 0), thickness=3)
+
+            kirpma_cerceve += 1#kırpma_cerceve değeri 1 artırılır.
+            cerceveler -= 1#alınan çerçeve sayısı 1 azaltılır.
+
+
+            if kirpma_cerceve == 5:#Eğer kırpma çerçeve sayısı belirlenen değere eşitse aktif_komut 1 artırlır ve çıktı olarak yazdırılır.
+                yeni_aktif += aktif_komut
+                print(aktif_komut)
+                if komut_indeksi==0:#Eğer komut indeksi 0 ise seri porta değer gönderilir.
+                    deger1 = str('A')
+                    serialport.write(deger1.encode())
+                    serialport.flush()
+
+                if komut_indeksi==1:#Eğer komut indeksi 1 ise seri porta değer gönderilir.
+                    deger2 = str('B')
+                    serialport.write(deger2.encode())
+                    serialport.flush()
+                if komut_indeksi==2:#Eğer komut indeksi 2 ise seri porta değer gönderilir.
+                    deger3 = str('C')
+                    serialport.write(deger3.encode())
+                    serialport.flush()
+                if komut_indeksi==3:#Eğer komut indeksi 3 ise seri porta değer gönderilir.
+                    deger4 = str('D')
+                    serialport.write(deger4.encode())
+                    serialport.flush()
+                if komut_indeksi==4:#Eğer komut indeksi 4 ise seri porta değer gönderilir.
+                    deger5 = str('E')
+                    serialport.write(deger5.encode())
+                    serialport.flush()
+                if komut_indeksi==5:#Eğer komut indeksi 5 ise seri porta değer gönderilir.
+                    deger6 = str('F')
+                    serialport.write(deger6.encode())
+                    serialport.flush()
+                if komut_indeksi==6:#Eğer komut indeksi 6 ise seri porta değer gönderilir.
+                    deger7 = str('G')
+                    serialport.write(deger7.encode())
+                    serialport.flush()
+                if komut_indeksi==7:#Eğer komut indeksi 7 ise seri porta değer gönderilir.
+                    deger8 = str('H')
+                    serialport.write(deger8.encode())
+                    serialport.flush()
+                if komut_indeksi==8:#Eğer komut indeksi 8 ise seri porta değer gönderilir.
+                    deger9 = str('I')
+                    serialport.write(deger9.encode())
+                    serialport.flush()
+                if komut_indeksi==9:#Eğer komut indeksi 9 ise seri porta değer gönderilir.
+                    deger10 = str('K')
+                    serialport.write(deger10.encode())
+                    serialport.flush()
+
+
+        else:#Eğer toplam kapanma oranı belirlenen değerden büyük değilse kırpma anındaki çerçeve sayısı 0 yapılır.
+            kirpma_cerceve = 0
+
+    #Eğer yenilenen çerçeve sayısı belirlenen değere eşit ise komut indeksi 1 artırılır ve çerçeve sayısı tekrar sıfırlanır.
+    if cerceveler == 20:
+        komut_indeksi += 1
+        cerceveler = 0
+
+    #Eğer komut indeksi 10 değerine eşit ise arayüzdeki komutların hepsi yürütülmüş demektir ve tekrar başa sarmak için değer sıfırlanır.
+    if komut_indeksi == 10:
+        komut_indeksi = 0
+
+    #0-20 arasındaki sayılar listelenir ve i değerine sırayla atanır.
+    for i in range(10):
+        if i == komut_indeksi:#Eğer i değeri komut indeksine eşitse o indeks kutusu beyaz yapılır.
+            beyaz = True
+
+        else:#Eğer i değeri komut indeksine eşit değilse o indeks beyaz yapılmaz.
+            beyaz = False
+        letter(i, komutlar[i], beyaz)
+
+    #Program açıldığında kamera görüntüsü ve ihtiyaç listesi gösterilir.
+    cv2.imshow("Kamera", kamera_cerceveleri)
+    cv2.imshow("Ihtiyac Listesi", arayuz)
+
+    #25 ms de bir çerçeveleri yenileyerek görüntü oluşturulur ve eğer 'q' harfine basıldığında programdan çıkar.
+    if cv2.waitKey(25)   &   0xFF == ord('q'):
+        break
+
+cap.release()#kamera görüntüsü serbest bırakılır.
+cv2.destroyAllWindows()#Tüm pencereler kapatılır.

@@ -1,0 +1,244 @@
+// Python.TC
+#include <Arduino.h>
+#include <Wire.h>
+#include <LiquidCrystal.h>
+
+
+const int acil_led = A0;
+const int agri_led = A1;
+const int yemek_led = A2;
+const int su_led = A3;
+const int dik_led = A4;
+const int sag_led = A5;
+const int sol_led = 6;
+const int tv_led = 7;
+const int temizlik_led = 8;
+const int wc_led = 9;
+const int button = 13;
+const int buzzer = 10;
+
+bool buttonState = false;
+int sondeger;
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+void setup()
+{
+  lcd.begin(16, 2);
+  lcd.home();
+  lcd.print("Yatalak Hasta");
+  lcd.setCursor(0, 1);
+  lcd.print("Yardim Cihazi");
+  pinMode(acil_led, OUTPUT);     // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(agri_led, OUTPUT);     // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(yemek_led, OUTPUT);    // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(su_led, OUTPUT);       // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(dik_led, OUTPUT);      // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(sag_led, OUTPUT);      // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(sol_led, OUTPUT);      // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(tv_led, OUTPUT);       // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(temizlik_led, OUTPUT); // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(wc_led, OUTPUT);       // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(button, INPUT);        // tanimladiğimiz cıkışı aktif ettik.
+  pinMode(buzzer, OUTPUT);       // tanimladiğimiz cıkışı aktif ettik.
+  Serial.begin(9600);            // serial port bağlantısını açtık
+}
+
+void loop()
+{
+  if (Serial.available()) //Serial Portta değer gelirse
+  {
+    int oku = Serial.read(); // gelen değeri oku
+
+    buttonState = digitalRead(button);
+
+    // if (buttonState)
+    // {
+    //   Serial.print("Buton durumu : ");
+    //   Serial.println(buttonState);
+    //   delay(500);
+    // }
+
+    if (oku == 'A') // içlerinden 0 değeri gelirse ledi söndür
+    {
+    acil:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Acil Yardim");
+      tone(buzzer, 440);
+      delay(100);
+      digitalWrite(acil_led, HIGH); // ledi söndür
+      noTone(buzzer);
+      delay(100);
+      digitalWrite(acil_led, LOW);
+      sondeger = 'A';
+    }
+    else if (oku == 'B') // içlerinden 1 değeri gelirse ledi kapat
+    {
+    agri:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Agrilarim");
+      lcd.setCursor(0, 1);
+      lcd.print("Var!");
+      delay(50);
+      tone(buzzer, 440);
+      digitalWrite(agri_led, HIGH); // led'i yak
+      delay(150);
+      noTone(buzzer);
+      digitalWrite(agri_led, LOW);
+      sondeger = 'B';
+    }
+    else if (oku == 'C') // içlerinden 1 değeri gelirse ledi kapat
+    {
+    yemek:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Yemek yemek");
+      lcd.setCursor(0, 1);
+      lcd.print("Istiyorum!");
+      delay(100);
+      tone(buzzer, 440);
+      digitalWrite(yemek_led, HIGH); // led'i yak
+      delay(200);
+      noTone(buzzer);
+      digitalWrite(yemek_led, LOW);
+      sondeger = 'C';
+    }
+    else if (oku == 'D') // içlerinden 4 değeri gelirse yatağı kaldır
+    {
+    su:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Su icmek");
+      lcd.setCursor(0, 1);
+      lcd.print("Istiyorum!");
+      delay(150);
+      tone(buzzer, 440);
+      digitalWrite(su_led, HIGH); // led'i yak
+      delay(200);
+      noTone(buzzer);
+      digitalWrite(su_led, LOW);
+      sondeger = 'D';
+    }
+    else if (oku == 'E') // içlerinden 4 değeri gelirse yatağı kaldır
+    {
+    dik:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Yatagi ");
+      lcd.setCursor(0, 1);
+      lcd.print("Kaldirin!");
+      delay(200);
+      tone(buzzer, 440);
+      digitalWrite(dik_led, HIGH); // led'i yak
+      delay(250);
+      noTone(buzzer);
+      digitalWrite(dik_led, LOW);
+      sondeger = 'E';
+    }
+    else if (oku == 'F') // içlerinden 0 değeri gelirse ledi söndür
+    {
+    sag:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Saga Donmek ");
+      lcd.setCursor(0, 1);
+      lcd.print("Istiyorum!");
+      delay(120);
+      tone(buzzer, 440);
+      digitalWrite(sag_led, HIGH); // ledi söndür
+      delay(160);
+      noTone(buzzer);
+      digitalWrite(sag_led, LOW);
+      sondeger = 'F';
+    }
+    else if (oku == 'G') // içlerinden 1 değeri gelirse ledi kapat
+    {
+    sol:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Sola Donmek");
+      lcd.setCursor(0, 1);
+      lcd.print("Istiyorum!");
+      delay(250);
+      tone(buzzer, 440);
+      digitalWrite(sol_led, HIGH); // led'i yak
+      delay(300);
+      noTone(buzzer);
+      digitalWrite(sol_led, LOW);
+      sondeger = 'G';
+    }
+    else if (oku == 'H') // içlerinden 1 değeri gelirse ledi kapat
+    {
+    tv:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Tv izlemek");
+      lcd.setCursor(0, 1);
+      lcd.print("Istiyorum!");
+      delay(150);
+      tone(buzzer, 440);
+      digitalWrite(tv_led, HIGH); // led'i yak
+      delay(230);
+      noTone(buzzer);
+      digitalWrite(tv_led, LOW);
+      sondeger = 'H';
+    }
+    else if (oku == 'I') // içlerinden 4 değeri gelirse yatağı kaldır
+    {
+    temizlik:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Temizlik");
+      lcd.setCursor(0, 1);
+      lcd.print("Ihtiyaci!");
+      delay(50);
+      tone(buzzer, 440);
+      digitalWrite(temizlik_led, HIGH); // led'i yak
+      delay(100);
+      noTone(buzzer);
+      digitalWrite(temizlik_led, LOW);
+      sondeger = 'I';
+    }
+    else if (oku == 'K') // içlerinden 4 değeri gelirse yatağı kaldır
+    {
+    wc:
+      lcd.clear();
+      lcd.home();
+      lcd.print("Tuvalet ");
+      lcd.setCursor(0, 1);
+      lcd.print("Ihtiyaci!");
+      delay(90);
+      tone(buzzer, 440);
+      digitalWrite(wc_led, HIGH); // led'i yak
+      delay(150);
+      noTone(buzzer);
+      digitalWrite(wc_led, LOW);
+      sondeger = 'K';
+    }
+    else if (Serial.available() == false)
+    {
+      if (sondeger == 'A')
+        goto acil;
+      else if (sondeger == 'B')
+        goto agri;
+      else if (sondeger == 'C')
+        goto yemek;
+      else if (sondeger == 'D')
+        goto su;
+      else if (sondeger == 'E')
+        goto dik;
+      else if (sondeger == 'F')
+        goto sag;
+      else if (sondeger == 'G')
+        goto sol;
+      else if (sondeger == 'H')
+        goto tv;
+      else if (sondeger == 'I')
+        goto temizlik;
+      else if (sondeger == 'K')
+        goto wc;
+    }
+  }
+}
